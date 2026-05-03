@@ -1,0 +1,18 @@
+{
+  "name": "sd-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord bot using Groq API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^16.4.7",
+    "groq-sdk": "^0.9.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
