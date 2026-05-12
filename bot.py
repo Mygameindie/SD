@@ -1,14 +1,17 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
+import datetime
 import json
 import os
 import io
 
 # --- CONFIGURATION ---
 ALLOWED_GUILDS = [1459863187393482833, 1477721787952267347]
+TESTER_ROLES = ["Tester (Computer)", "Tester (Mobile)", "Tester (Console)"]
 STAFF_ROLES = ["Tester (Computer)","Tester (Mobile)","Tester (Console)", "War Manager", "Co Clan Leader", "Absolute Solver"]
 HIGH_STAFF_ROLES = ["Co Clan Leader", "Absolute Solver"]
+TESTER_COMMAND_ROLES = TESTER_ROLES + HIGH_STAFF_ROLES
 
 # Channel IDs
 ANNOUNCE_CHANNEL_ID = 1469909170827431946
@@ -19,6 +22,7 @@ LEAVE_CHANNEL_ID = 1459892472585912362
 
 # Role & Assets
 CREW_ROLE_ID = 1459865077904834642
+COOL_ROLE_NAMES = ["Cool", "Cool Role", "cool role"]
 CLAN_NAME = "𝚂𝚠𝚎𝚎𝚝 𝙳𝚎า𝚍𝚕𝚢 -𝚂𝙳"
 BOOST_EMOJI = "<:Discord_Server_Boots:1470836031770071264>"
 GIF_DIVIDER = "https://cdn.discordapp.com/attachments/1327188364885102594/1443075988580995203/fixedbulletlines.gif"
@@ -55,6 +59,12 @@ def get_member_stats(member: discord.Member):
         elif role.name in TIERS: t = role.name
         elif role.name in STAGES: s = role.name
     return r, t, s
+
+
+def get_role_by_name(guild: discord.Guild, role_names):
+    """Find a role by one of several names, case-insensitive."""
+    wanted = {name.lower() for name in role_names}
+    return next((role for role in guild.roles if role.name.lower() in wanted), None)
 
 
 # --- UI COMPONENTS ---
@@ -293,14 +303,14 @@ async def scan(ctx):
 
 
 @bot.tree.command(name="addrank", description="Assign Rank/Tier/Stage roles to a member")
-@app_commands.checks.has_any_role(*STAFF_ROLES)
+@app_commands.checks.has_any_role(*HIGH_STAFF_ROLES)
 async def addrank(interaction: discord.Interaction, member: discord.Member):
     view = RankSelectView(member)
     await interaction.response.send_message(view._status_text(), view=view, ephemeral=True)
 
 
 @bot.tree.command(name="removerank", description="Remove all rank/tier/stage roles from a member")
-@app_commands.checks.has_any_role(*STAFF_ROLES)
+@app_commands.checks.has_any_role(*HIGH_STAFF_ROLES)
 async def removerank(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.defer(ephemeral=True)
     category_ids = set(ROLES_MAP.values())
@@ -310,6 +320,34 @@ async def removerank(interaction: discord.Interaction, member: discord.Member):
     try:
         await member.remove_roles(*to_remove)
         await interaction.followup.send(f"✅ Removed all rank roles from {member.mention}.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="pass", description="Mark a member as passed and give the Cool role")
+@app_commands.checks.has_any_role(*TESTER_COMMAND_ROLES)
+async def pass_cmd(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer(ephemeral=True)
+    cool_role = get_role_by_name(interaction.guild, COOL_ROLE_NAMES)
+    if not cool_role:
+        return await interaction.followup.send("❌ Cool role not found. Create a role named `Cool` or `Cool Role`.", ephemeral=True)
+
+    try:
+        await member.add_roles(cool_role, reason=f"Passed by {interaction.user}")
+        await interaction.followup.send(f"✅ {member.mention} passed and received {cool_role.mention}.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
+
+
+@bot.tree.command(name="no-pass", description="Mark a member as not passed and timeout them for 1 day")
+@app_commands.checks.has_any_role(*TESTER_COMMAND_ROLES)
+async def no_pass_cmd(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer(ephemeral=True)
+    until = discord.utils.utcnow() + datetime.timedelta(days=1)
+
+    try:
+        await member.timeout(until, reason=f"No pass by {interaction.user}")
+        await interaction.followup.send(f"⏱️ {member.mention} did not pass and was timed out for 1 day.", ephemeral=True)
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
 
